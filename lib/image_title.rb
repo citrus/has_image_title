@@ -78,7 +78,6 @@ class ImageTitle < ActiveRecord::Base
     -pointsize #{@options[:size]} \
     -size #{@options[:width]}x#{@options[:height]} \
     -weight #{@options[:weight]} \
-    -kerning #{@options[:kerning]} \
     caption:'#{@text}' \
     #{@options[:destination]}/#{@filename}".gsub(/\\/, '').gsub(/\s{1,}/, ' ')
   end

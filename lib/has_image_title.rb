@@ -13,7 +13,7 @@ module Citrus
         @options ||= {
           :field_name => 'title',
           :font => "HelveticaNeueLTStd-UltLt.otf",
-          :font_path => "~/Library/Fonts",
+          :font_path => "#{RAILS_ROOT}/fonts",
           :size => 72,
           :width => 840,
           :height => nil,
@@ -21,9 +21,8 @@ module Citrus
           :background_alpha => '00',
           :color => '#e04e10',
           :weight => 400,
-          :kerning => -2,
           :destination => "#{RAILS_ROOT}/public/images/titles",
-          :command_path => '/usr/local/ImageMagick-6.5.3/bin',
+          :command_path => '/usr/bin',
           :log_command => true,
           :dry_run => false
         }
