@@ -18,8 +18,11 @@ class ImageTitle < ActiveRecord::Base
     @options[:font_path] = clean_path( @options[:font_path] )
     @options[:destination] = clean_path( @options[:destination] )
 
-    delete_current_image if self.file_name
-    
+    if self.file_name
+      backup_current_image
+      delete_current_image
+    end
+      
     @filename = make_unique_filename(@text)
   
     logger.info "[has_image_title] generating image title.."
@@ -29,16 +32,19 @@ class ImageTitle < ActiveRecord::Base
     
     info = `identify -format "%b,%w,%h" #{@options[:destination]}/#{@filename}`.split(",")
     
-    self.file_name = @filename
-    self.file_size = info[0]
-    self.width = info[1]
-    self.height = info[2]
-    self.save
+    if info.empty? || !File.exists?(@filename)
+      err = "[has_image_title] Image generation failed - using backup image if it exists. Please make sure ImageMagick is installed properly."
+      logger.error err
+      restore_backup_image
+      self.errors.add_to_base("Image generation failed - using backup image if it exists. Please make sure ImageMagick is installed properly.")
+    else  
+      self.file_name = @filename
+      self.file_size = info[0]
+      self.width = info[1]
+      self.height = info[2]
+      self.save
+    end
   end
-  
-  #def options
-  #  @options
-  #end
   
   def make_unique_filename(str="")
     count = 2
@@ -58,12 +64,35 @@ class ImageTitle < ActiveRecord::Base
     "#{fle}.png"
   end
   
+  def setup_backup_folder
+    @options ||= self.imagable.options
+    return false unless @options
+    FileUtils.mkdir "#{@options[:destination]}/backups/" unless File.directory?("#{@options[:destination]}/backups/")
+  end
+  
+  def backup_current_image
+    @options ||= self.imagable.options
+    return false unless @options    
+    setup_backup_folder
+    path = "#{@options[:destination]}/#{self.file_name}"
+    new_path = "#{@options[:destination]}/backups/#{self.file_name}"
+    FileUtils.cp(path, new_path) if !path.empty? && File.exists?(path)
+  end
+  
+  def restore_backup_image
+    @options ||= self.imagable.options
+    return false unless @options    
+    path = "#{@options[:destination]}/backups/#{self.file_name}"
+    new_path = "#{@options[:destination]}/#{self.file_name}"
+    FileUtils.cp(path, new_path) if !path.empty? && File.exists?(path)
+  end
+  
   def delete_current_image
     @options ||= self.imagable.options
     return false unless @options    
     path = "#{@options[:destination]}/#{self.file_name}"
     File.delete(path) if !path.empty? && File.exists?(path)
-  end  
+  end
   
   def clean_path(str="")
     str.to_s.gsub(/\/$/, "")
@@ -71,6 +100,7 @@ class ImageTitle < ActiveRecord::Base
        
   def title_command
     "#{@options[:command_path]}/convert \
+    -trim \
     -antialias \
     -background '#{@options[:background_color]}#{@options[:background_alpha]}' \
     -fill '#{@options[:color]}' \
@@ -78,6 +108,7 @@ class ImageTitle < ActiveRecord::Base
     -pointsize #{@options[:size]} \
     -size #{@options[:width]}x#{@options[:height]} \
     -weight #{@options[:weight]} \
+    -kerning #{@options[:kerning]} \
     caption:'#{@text}' \
     #{@options[:destination]}/#{@filename}".gsub(/\\/, '').gsub(/\s{1,}/, ' ')
   end

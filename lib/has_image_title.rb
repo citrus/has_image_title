@@ -21,8 +21,9 @@ module Citrus
           :background_alpha => '00',
           :color => '#e04e10',
           :weight => 400,
+          :kerning => -2,
           :destination => "#{RAILS_ROOT}/public/images/titles",
-          :command_path => '/usr/bin',
+          :command_path => '',
           :log_command => true,
           :dry_run => false
         }
