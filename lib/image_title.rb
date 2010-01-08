@@ -16,6 +16,8 @@ class ImageTitle < ActiveRecord::Base
     @options[:font_path] = clean_path( @options[:font_path] )
     @options[:destination] = clean_path( @options[:destination] )
 
+    setup_title_folder unless has_title_folder?
+
     if has_current_file?
       backup_current_image
       delete_current_image
@@ -28,6 +30,7 @@ class ImageTitle < ActiveRecord::Base
     
     `#{title_command}` if @options
     
+    logger.info "[has_image_title] identify -format \"%b,%w,%h\" #{@options[:destination]}/#{@filename}" if @options[:log_command]
     info = `identify -format "%b,%w,%h" #{@options[:destination]}/#{@filename}`.split(",")
     
     logger.info "[has_image_title] #{info.inspect}"
@@ -63,6 +66,18 @@ class ImageTitle < ActiveRecord::Base
     fle = str.to_s.downcase.gsub(/\s/, '_').gsub(/[^a-z0-9\_]/, '').gsub(/[\_]+/, '_').gsub(/\_$/, '')
     fle = (0..25).map{ ('a'..'z').to_a[rand(26)] }.join if fle.empty?
     "#{fle}.png"
+  end
+  
+  def has_title_folder?
+    @options ||= self.imagable.options
+    return false unless @options
+    File.directory?("#{@options[:destination]}")
+  end
+  
+  def setup_title_folder
+    @options ||= self.imagable.options
+    return false unless @options
+    FileUtils.mkdir "#{@options[:destination]}" unless has_title_folder?
   end
   
   def setup_backup_folder
