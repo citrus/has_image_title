@@ -16,8 +16,6 @@ class ImageTitle < ActiveRecord::Base
     @options[:font_path] = clean_path( @options[:font_path] )
     @options[:destination] = clean_path( @options[:destination] )
 
-    setup_title_folder unless has_title_folder?
-
     if has_current_file?
       backup_current_image
       delete_current_image
@@ -25,27 +23,29 @@ class ImageTitle < ActiveRecord::Base
       
     @filename = make_unique_filename(@text)
   
-    logger.info "[has_image_title] generating image title.."
-    logger.info "[has_image_title] #{title_command}" if @options[:log_command]
+    logger.info "[has_image_title] generating image title..."
+    logger.info "[has_image_title] #{title_command_string}" if @options[:log_command]
     
-    `#{title_command}` if @options
+    `#{title_command_string}`
     
-    logger.info "[has_image_title] identify -format \"%b,%w,%h\" #{@options[:destination]}/#{@filename}" if @options[:log_command]
-    info = `identify -format "%b,%w,%h" #{@options[:destination]}/#{@filename}`.split(",")
+    logger.info "[has_image_title] #{info_command_string}" if @options[:log_command]
     
-    logger.info "[has_image_title] #{info.inspect}"
+    info = `#{info_command_string}`.to_s.strip
     
-    if info.empty? || !File.exists?("#{@options[:destination]}/#{@filename}")
+    logger.info "[has_image_title] has info? #{!info.empty?}, file info: #{info.inspect}, file exists? #{File.exists?(new_image_path)}" if @options[:debug]
+    
+    if info.empty? || !File.exists?(new_image_path)
       msg = "Image generation failed - using backup image if it exists. Please make sure ImageMagick is installed properly."
       err = "[has_image_title] #{msg}"
       logger.error err
       restore_backup_image if has_current_file?
       self.errors.add_to_base(msg)
-    else  
+    else
+      file_info = info.split(",")
       self.file_name = @filename
-      self.file_size = info[0].to_i
-      self.width = info[1].to_i
-      self.height = info[2].to_i
+      self.file_size = file_info[0].to_i
+      self.width = file_info[1].to_i
+      self.height = file_info[2].to_i
       self.save
     end
   end
@@ -68,18 +68,6 @@ class ImageTitle < ActiveRecord::Base
     "#{fle}.png"
   end
   
-  def has_title_folder?
-    @options ||= self.imagable.options
-    return false unless @options
-    File.directory?("#{@options[:destination]}")
-  end
-  
-  def setup_title_folder
-    @options ||= self.imagable.options
-    return false unless @options
-    FileUtils.mkdir "#{@options[:destination]}" unless has_title_folder?
-  end
-  
   def setup_backup_folder
     @options ||= self.imagable.options
     return false unless @options
@@ -90,7 +78,7 @@ class ImageTitle < ActiveRecord::Base
     @options ||= self.imagable.options
     return false unless @options || !has_current_file?
     setup_backup_folder
-    path = "#{@options[:destination]}/#{self.file_name}"
+    path = current_image_path
     new_path = "#{@options[:destination]}/backups/#{self.file_name}"
     FileUtils.cp(path, new_path) if !path.empty? && File.exists?(path)
   end
@@ -99,15 +87,23 @@ class ImageTitle < ActiveRecord::Base
     @options ||= self.imagable.options
     return false unless @options || !has_current_file?
     path = "#{@options[:destination]}/backups/#{self.file_name}"
-    new_path = "#{@options[:destination]}/#{self.file_name}"
+    new_path = current_image_path
     FileUtils.cp(path, new_path) if !path.empty? && File.exists?(path)
   end
   
   def delete_current_image
     @options ||= self.imagable.options
     return false unless @options    
-    path = "#{@options[:destination]}/#{self.file_name}"
+    path = current_image_path
     File.delete(path) if !path.empty? && File.exists?(path)
+  end
+  
+  def current_image_path
+    "#{@options[:destination]}/#{self.file_name}"
+  end
+  
+  def new_image_path
+    "#{@options[:destination]}/#{@filename}"
   end
   
   def has_current_file?
@@ -121,8 +117,17 @@ class ImageTitle < ActiveRecord::Base
   def convert_command
     @options[:command_path] && !@options[:command_path].empty? ? "#{@options[:command_path]}/convert" : "convert"
   end
+     
+  def identify_command
+    @options[:command_path] && !@options[:command_path].empty? ? "#{@options[:command_path]}/identify" : "identify"
+  end
+  
+  
+  def info_command_string
+    "#{identify_command} -format '%b,%w,%h' #{new_image_path}"
+  end
        
-  def title_command
+  def title_command_string
     "#{convert_command} \
     -trim \
     -antialias \
@@ -134,8 +139,9 @@ class ImageTitle < ActiveRecord::Base
     -weight #{@options[:weight]} \
     -kerning #{@options[:kerning]} \
     caption:'#{@text}' \
-    #{@options[:destination]}/#{@filename}".gsub(/\\/, '').gsub(/\s{1,}/, ' ')
+    #{new_image_path}".gsub(/\\/, '').gsub(/\s{1,}/, ' ')
   end
+  
   
         
   def logger

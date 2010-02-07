@@ -24,8 +24,8 @@ module Citrus
           :kerning => -2,
           :destination => "#{RAILS_ROOT}/public/images/titles",
           :command_path => '',
-          :log_command => true,
-          :dry_run => false
+          :log_command => false,
+          :debug => false
         }
       end
           
@@ -67,11 +67,8 @@ module Citrus
       end
       
       def generate_image_title
-      
-        txt = eval("self.#{self.class.options[:field_name]}")
-      
-        logger.info "[has_image_title] @ generate_image_title => #{txt} | #{@options.inspect}"
-        
+
+        txt = eval("self.#{self.class.options[:field_name]}")        
         @title = self.image_title || ImageTitle.new(:imagable => self)
         @title.say txt, self.class.options
         
@@ -88,4 +85,5 @@ module Citrus
     
   end
 end
+
 ActiveRecord::Base.send(:include, Citrus::HasImageTitle)
