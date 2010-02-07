@@ -16,6 +16,8 @@ class ImageTitle < ActiveRecord::Base
     @options[:font_path] = clean_path( @options[:font_path] )
     @options[:destination] = clean_path( @options[:destination] )
 
+    setup_destination_folder
+    
     if has_current_file?
       backup_current_image
       delete_current_image
@@ -68,6 +70,13 @@ class ImageTitle < ActiveRecord::Base
     "#{fle}.png"
   end
   
+  
+  def setup_destination_folder
+    FileUtils.mkdir @options[:destination] unless File.directory?(@options[:destination])
+  end
+  
+  
+  
   def setup_backup_folder
     @options ||= self.imagable.options
     return false unless @options
@@ -98,6 +107,10 @@ class ImageTitle < ActiveRecord::Base
     File.delete(path) if !path.empty? && File.exists?(path)
   end
   
+  
+  
+  
+  
   def current_image_path
     "#{@options[:destination]}/#{self.file_name}"
   end
@@ -114,6 +127,9 @@ class ImageTitle < ActiveRecord::Base
     str.to_s.gsub(/\/$/, "")
   end
   
+  
+  
+  
   def convert_command
     @options[:command_path] && !@options[:command_path].empty? ? "#{@options[:command_path]}/convert" : "convert"
   end
@@ -121,6 +137,9 @@ class ImageTitle < ActiveRecord::Base
   def identify_command
     @options[:command_path] && !@options[:command_path].empty? ? "#{@options[:command_path]}/identify" : "identify"
   end
+  
+  
+  
   
   
   def info_command_string
