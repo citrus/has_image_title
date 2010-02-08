@@ -7,7 +7,8 @@ class ImageTitle < ActiveRecord::Base
   before_destroy :delete_current_image
  
   def say(text="",options={})    
-    @options = options    
+  
+    @options = Citrus::HasImageTitle.default_options.merge(options)
  
     @text = text.gsub(/'/, "\`")
 
@@ -26,13 +27,10 @@ class ImageTitle < ActiveRecord::Base
     @filename = make_unique_filename(@text)
   
     logger.info "[has_image_title] generating image title..."
-    logger.info "[has_image_title] #{title_command_string}" if @options[:log_command]
+
+    run('convert', title_command_string)
+    info = run('identify', info_command_string)
     
-    `#{title_command_string}`
-    
-    logger.info "[has_image_title] #{info_command_string}" if @options[:log_command]
-    
-    info = `#{info_command_string}`.to_s.strip
     
     logger.info "[has_image_title] has info? #{!info.empty?}, file info: #{info.inspect}, file exists? #{File.exists?(new_image_path)}" if @options[:debug]
     
@@ -50,6 +48,7 @@ class ImageTitle < ActiveRecord::Base
       self.height = file_info[2].to_i
       self.save
     end
+    self
   end
   
   def make_unique_filename(str="")
@@ -72,9 +71,8 @@ class ImageTitle < ActiveRecord::Base
   
   
   def setup_destination_folder
-    FileUtils.mkdir @options[:destination] unless File.directory?(@options[:destination])
+    FileUtils.mkdir "#{@options[:destination]}" unless File.directory?("#{@options[:destination]}")
   end
-  
   
   
   def setup_backup_folder
@@ -108,9 +106,6 @@ class ImageTitle < ActiveRecord::Base
   end
   
   
-  
-  
-  
   def current_image_path
     "#{@options[:destination]}/#{self.file_name}"
   end
@@ -126,29 +121,13 @@ class ImageTitle < ActiveRecord::Base
   def clean_path(str="")
     str.to_s.gsub(/\/$/, "")
   end
-  
-  
-  
-  
-  def convert_command
-    @options[:command_path] && !@options[:command_path].empty? ? "#{@options[:command_path]}/convert" : "convert"
-  end
-     
-  def identify_command
-    @options[:command_path] && !@options[:command_path].empty? ? "#{@options[:command_path]}/identify" : "identify"
-  end
-  
-  
-  
-  
-  
+    
   def info_command_string
-    "#{identify_command} -format '%b,%w,%h' #{new_image_path}"
+    "-format '%b,%w,%h' #{new_image_path}"
   end
        
   def title_command_string
-    "#{convert_command} \
-    -trim \
+    "-trim \
     -antialias \
     -background '#{@options[:background_color]}#{@options[:background_alpha]}' \
     -fill '#{@options[:color]}' \
@@ -158,10 +137,19 @@ class ImageTitle < ActiveRecord::Base
     -weight #{@options[:weight]} \
     -kerning #{@options[:kerning]} \
     caption:'#{@text}' \
-    #{new_image_path}".gsub(/\\/, '').gsub(/\s{1,}/, ' ')
+    #{new_image_path}"
+  end  
+      
+  def path_for_command command
+    path = [@options[:command_path], command].compact
+    File.join(*path)
   end
   
-  
+  def run cmd, params
+    command = %Q<#{%Q[#{path_for_command(cmd)} #{params.to_s.gsub(/\\|\n|\r/, '')}].gsub(/\s+/, " ")}>
+    logger.info command if @options[:log_command]
+    `#{command}`
+  end  
         
   def logger
     Citrus::HasImageTitle::logger

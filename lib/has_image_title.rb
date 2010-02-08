@@ -1,4 +1,4 @@
-require 'image_title'
+#require 'image_title'
 
 module Citrus
   module HasImageTitle
@@ -24,8 +24,8 @@ module Citrus
           :kerning => -2,
           :destination => "#{RAILS_ROOT}/public/images/titles",
           :command_path => '',
-          :log_command => false,
-          :debug => false
+          :log_command => true,
+          :debug => true
         }
       end
           
