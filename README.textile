@@ -1,0 +1,3 @@
+Has Image Title is no longer maintained and somewhat depreciated.
+
+Check out [MagickTitle](https://github.com/citrus/magick_title) instead...
